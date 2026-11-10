@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BANI Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
 body{background:#0a0a1a;color:#fff;min-height:100vh;padding:20px;text-align:center}
@@ -29,17 +30,25 @@ button:disabled{opacity:.5}
   <button id="playBtn" onclick="play()">شروع بازی</button>
   <button id="cashBtn" onclick="cashout()" disabled>برداشت (×1.00)</button>
 </div>
+
 <script>
 const tg = window.Telegram.WebApp;
 tg.ready(); tg.expand();
-const API = "https://YOUR-RENDER.onrender.com/api";
+
+// ⚠️ اینجا آدرس و کلید Supabase خودت رو بذار
+const SUPABASE_URL = "https://xxxxx.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...."; // anon key
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const userId = tg.initDataUnsafe?.user?.id;
 let curMult = 1, curBet = 0, timer = null;
 
 async function loadBal() {
-  const r = await fetch(`${API}/balance/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData}) });
-  const d = await r.json();
-  document.getElementById("bal").textContent = d.ton || 0;
-  return d.ton || 0;
+  if (!userId) return 0;
+  const { data } = await db.from("users").select("balance_ton").eq("telegram_id", userId).single();
+  const bal = data?.balance_ton || 0;
+  document.getElementById("bal").textContent = bal;
+  return bal;
 }
 loadBal();
 
@@ -62,7 +71,7 @@ async function play() {
   }, 100);
 }
 
-function crash() {
+async function crash() {
   clearInterval(timer);
   document.getElementById("rocket").classList.add("boom");
   document.getElementById("rocket").textContent = "💥";
@@ -71,7 +80,8 @@ function crash() {
   document.getElementById("playBtn").disabled = false;
   document.getElementById("cashBtn").disabled = true;
   tg.HapticFeedback.notificationOccurred("error");
-  fetch(`${API}/bet/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData, amount: curBet, multiplier: 0, win: false}) });
+  const bal = await loadBal();
+  await db.from("users").update({ balance_ton: bal - curBet }).eq("telegram_id", userId);
   setTimeout(() => {
     document.getElementById("rocket").classList.remove("boom");
     document.getElementById("rocket").textContent = "🚀";
@@ -89,7 +99,8 @@ async function cashout() {
   document.getElementById("cashBtn").disabled = true;
   tg.HapticFeedback.notificationOccurred("success");
   tg.showAlert(`✅ برداشت موفق!\n×${curMult.toFixed(2)} = ${win.toFixed(3)} TON`);
-  await fetch(`${API}/bet/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData, amount: curBet, multiplier: curMult, win: true}) });
+  const bal = await loadBal();
+  await db.from("users").update({ balance_ton: bal - curBet + win }).eq("telegram_id", userId);
   loadBal();
 }
 </script>
