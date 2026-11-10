@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BANI Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
+body{background:#0a0a1a;color:#fff;min-height:100vh;padding:20px;text-align:center}
+h1{color:#ff4444;margin:20px 0;text-shadow:0 0 20px #ff4444}
+.card{background:#1a1a2e;border-radius:15px;padding:20px;margin:15px 0;border:2px solid #ff4444}
+input{width:100%;padding:12px;border-radius:8px;border:2px solid #ff4444;background:#000;color:#fff;font-size:16px;margin:10px 0}
+button{width:100%;padding:15px;border:none;border-radius:10px;background:linear-gradient(135deg,#ff4444,#ff8800);color:#fff;font-size:18px;font-weight:bold;margin:10px 0;cursor:pointer}
+button:disabled{opacity:.5}
+.rocket{font-size:80px;transition:all 2s;display:inline-block}
+.boom{font-size:120px;animation:boom 0.5s}
+@keyframes boom{0%{transform:scale(0)}50%{transform:scale(1.5)}100%{transform:scale(1)}}
+.mult{font-size:48px;color:#00ff88;font-weight:bold;margin:20px 0}
+</style>
+</head>
+<body>
+<h1>🚀 موشک انفجاری</h1>
+<div class="card"><p>موجودی: <b id="bal">0</b> TON</p></div>
+<div id="game">
+  <div id="rocket" class="rocket">🚀</div>
+  <div id="mult" class="mult">×1.00</div>
+  <input id="bet" type="number" placeholder="حداقل 0.1" step="0.1" value="0.1">
+  <button id="playBtn" onclick="play()">شروع بازی</button>
+  <button id="cashBtn" onclick="cashout()" disabled>برداشت (×1.00)</button>
+</div>
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready(); tg.expand();
+const API = "https://YOUR-RENDER.onrender.com/api";
+let curMult = 1, curBet = 0, timer = null;
+
+async function loadBal() {
+  const r = await fetch(`${API}/balance/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData}) });
+  const d = await r.json();
+  document.getElementById("bal").textContent = d.ton || 0;
+  return d.ton || 0;
+}
+loadBal();
+
+async function play() {
+  const bet = parseFloat(document.getElementById("bet").value);
+  if (isNaN(bet) || bet < 0.1) { tg.showAlert("حداقل 0.1 TON"); return; }
+  const bal = await loadBal();
+  if (bet > bal) { tg.showAlert("موجودی کافی نیست"); return; }
+  curBet = bet; curMult = 1;
+  document.getElementById("playBtn").disabled = true;
+  document.getElementById("cashBtn").disabled = false;
+  const rocket = document.getElementById("rocket");
+  rocket.style.transform = "translateY(-50px)";
+  timer = setInterval(() => {
+    curMult += 0.05;
+    document.getElementById("mult").textContent = "×" + curMult.toFixed(2);
+    document.getElementById("cashBtn").textContent = `برداشت (×${curMult.toFixed(2)})`;
+    rocket.style.transform = `translateY(${-50 - curMult*20}px)`;
+    if (Math.random() < 0.02 + curMult * 0.01) { crash(); }
+  }, 100);
+}
+
+function crash() {
+  clearInterval(timer);
+  document.getElementById("rocket").classList.add("boom");
+  document.getElementById("rocket").textContent = "💥";
+  document.getElementById("mult").textContent = "×" + curMult.toFixed(2) + " 💥";
+  document.getElementById("mult").style.color = "#ff4444";
+  document.getElementById("playBtn").disabled = false;
+  document.getElementById("cashBtn").disabled = true;
+  tg.HapticFeedback.notificationOccurred("error");
+  fetch(`${API}/bet/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData, amount: curBet, multiplier: 0, win: false}) });
+  setTimeout(() => {
+    document.getElementById("rocket").classList.remove("boom");
+    document.getElementById("rocket").textContent = "🚀";
+    document.getElementById("rocket").style.transform = "none";
+    document.getElementById("mult").textContent = "×1.00";
+    document.getElementById("mult").style.color = "#00ff88";
+    loadBal();
+  }, 2000);
+}
+
+async function cashout() {
+  clearInterval(timer);
+  const win = curBet * curMult;
+  document.getElementById("playBtn").disabled = false;
+  document.getElementById("cashBtn").disabled = true;
+  tg.HapticFeedback.notificationOccurred("success");
+  tg.showAlert(`✅ برداشت موفق!\n×${curMult.toFixed(2)} = ${win.toFixed(3)} TON`);
+  await fetch(`${API}/bet/`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({initData: tg.initData, amount: curBet, multiplier: curMult, win: true}) });
+  loadBal();
+}
+</script>
+</body>
+</html>
