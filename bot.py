@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 DATABASE_URL = os.environ.get("SUPABASE_URL") or os.environ["DATABASE_URL"]
 OWNER_ID = int(os.environ["OWNER_ID"])
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://your-vercel-app.vercel.app")
+WEBAPP_URL = "https://mohamad12rezazade-beep.github.io/MINI-AP/"
 WALLET = "UQA9sAdUajvpJd7iIBSKuhppy34ZPXReecKGLHiwdna8qOi_"
 MIN = 0.1
 
